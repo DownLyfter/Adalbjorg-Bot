@@ -1,0 +1,20 @@
+{
+  "name": "mugbotplhpa",
+  "version": "0.0.3",
+  "description": "This is my 2022 bot.",
+  "main": "index.js",
+  "scripts": {
+    "test": "none"
+  },
+  "author": "Atsuko#0069",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DownLyfter/Mug-Bot"
+  },
+  "dependencies": {
+    "discord.js": "^13.6.0",
+    "fs": "^0.0.1-security",
+    "jsonfile": "^6.1.0"
+  }
+}
