@@ -13,7 +13,11 @@
     "url": "git+https://github.com/DownLyfter/Mug-Bot"
   },
   "dependencies": {
+    "@discordjs/builders": "^1.4.0",
+    "@discordjs/rest": "^1.5.0",
+    "discord-api-types": "^0.37.27",
     "discord.js": "^13.6.0",
+    "dotenv": "^16.0.3",
     "fs": "^0.0.1-security",
     "jsonfile": "^6.1.0"
   }
