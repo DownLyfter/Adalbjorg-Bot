@@ -9,24 +9,51 @@ function getRandomIntInclusive(min, max) {
   max = Math.floor(max)
   return Math.floor(Math.random() * (max - min + 1) + min) // The maximum is inclusive and the minimum is inclusive
 }
+function newStatsCreate(msgID, guildID) {
+  const guildStats = stats[guildID];
+  if (msgID in guildStats === false) {
+    guildStats[msgID] = {
+      messages: 0,
+      xp: 0,
+      xpToNextLevel: 5,
+      level: 0,
+      lastVersionUsed: 1,
+      lastMessageTime: Date.now(),
+      gbp: 0,
+      voiceJoinTime: 0,
+      voiceChannelTime: 0,
+      voiceChannelJoines: 0,
+      voiceChannelLeaves: 0,
+      voiceChannelDefens: 0,
+      voiceChannelMutes: 0,
+      voiceChannelAfks: 0
+    }
+    saveStats();
+  };
+  return;
+}
 require("dotenv").config()
+
 const {
   prefix,
   token,
   BotVersion,
 } = require('./config.json');
+
 const {
   Client,
   Intents,
-  Collection
+  Collection,
+  VoiceState
 } = require('discord.js');
 const client = new Client({
-  intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES, Intents.FLAGS.GUILD_MEMBERS]
+  intents: [Intents.FLAGS.GUILD_VOICE_STATES, Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES, Intents.FLAGS.GUILD_MEMBERS]
 });
 const { REST } = require("@discordjs/rest")
 const { Routes } = require("discord-api-types/v9")
 const jsonfile = require('jsonfile');
 const fs = require('fs');
+
 const commandFiles = fs.readdirSync("./commands").filter(file => file.endsWith(".js"))
 const commands= []
 
@@ -53,97 +80,105 @@ if (fs.existsSync('stats.json')) {
 client.once('ready', () => {
   console.log('Bot is online.');
 
-  const CLIENT_ID = client.user.id
+  const CLIENT_ID = client.user.id;
 
   const rest = new REST({
     version: "9"
-  }).setToken(token)
+  }).setToken(token);
 
     try {
       if (process.env.ENV === "production") {
          rest.put(Routes.applicationCommands(CLIENT_ID),{
           body: commands
-        })
-        console.log("Successfully registered commands globally.")
+        });
+        console.log("Successfully registered commands globally.");
       } else {
          rest.put(Routes.applicationGuildCommands(CLIENT_ID, process.env.GUILD_ID),{
           body: commands
-        })
-        console.log("Successfully registered commands locally.")
-      }
+        });
+        console.log("Successfully registered commands locally.");
+      };
     } catch (err) {
-      if (err) console.error(err)
+      if (err) console.error(err);
     }
   
 });
+
+
+client.on('voiceStateUpdate', (oldState, newState) => {
+  if (oldState.member.user.bot) return; //bot Check
+
+  const guildStats = stats[newState.guild.id];
+  if (newState.member.id in guildStats === false) newStatsCreate(newState.member.id, newState.guild.id); //This is checking if the user has stats yet and if not creating them.
+  const userStats = guildStats[newState.member.id];
+
+  if (newState.channelId) { //Checks if user joins a vc
+    if (!oldState.channelId) {  //Checks if user joined a voice channel or came from another one.
+      userStats.voiceChannelJoines ++;
+      userStats.voiceJoinTime = Date.now();
+    } else return //if they came from another nothing is done untill they leave the voice channel.
+  }
+  if (!newState.channelId) { //checks if user leaves a voice channel.
+    userStats.voiceChannelLeaves--;
+    let loops = 0;
+    let xpAddLoops = Math.floor((Date.now() - userStats.voiceJoinTime) / 1000);
+    while (xpAddLoops >= loops) {
+      userStats.xp += getRandomIntInclusive(5, 15);
+      if (doubleXpWeekend === true) getRandomIntInclusive(5, 25);
+      loops++
+    };
+  };
+});
+
 client.on("interactionCreate", async interaction => { //No clue found this on the internet
-  if (!interaction.isCommand()) return
+  if (!interaction.isCommand()) return;
 
-  const command = client.commands.get(interaction.commandName)
+  const command = client.commands.get(interaction.commandName);
 
-  if (!command) return
+  if (!command) return;
   try {
-    await command.execute(interaction)
+    await command.execute(interaction);
   } catch(err) {
-    if (err) console.err(err)
+    if (err) console.err(err);
     await interaction.reply({
       content: "An error occured while executing that command.",
       emphemeral: true
-    })
-  }
+    });
+  };
 }) //this is the end of the internet magic codee.
 
 client.on('guildMemberAdd', member => {
   if (!member.guild.id in stats) {
-    stats[member.guild.id] = {}
-    saveStats()
-  }
-  console.log(member.guild.id) 
+  let id = member.author.id;
+  newStatsCreate(id, member.guild.id)};
+  console.log(member.guild.id);
   const myGuild = client.guilds.cache.get('1060787815086051418');
   const joinRole = myGuild.roles.cache.find(role => role.name === 'Binner\'s');
-  console.log('User ' + member.user.username + ' has join ther server!')
-  member.roles.add(joinRole)
-  member.setNickname(`Saint ${member.user.username}`)
+  console.log('User ' + member.user.username + ' has join ther server!');
+  member.roles.add(joinRole);
+  member.setNickname(`Saint ${member.user.username}`);
 });
 
 client.on('messageCreate', async msg => {
-  if (msg.author.bot === true) return //Bot check.
+  if (msg.author.bot === true) return; //Bot check.
 
   let args2 = msg.content.split(/ +/); //We only use this to check if they are a banned word in thier message.
   let x = 0
   while (x < args2.length) {
-    if (bannedWords.includes(args2[x]) === true) msg.delete()
+    if (bannedWords.includes(args2[x]) === true) msg.delete();
     x++
   }
+  const guildStats = stats[msg.guild.id];
+  if (msg.author.id in guildStats === false) newStatsCreate(msg.author.id, msg.guild.id); //This is checking if the user has stats yet and if not creating them.
+  const userStats = guildStats[msg.author.id];
 
-    if (msg.guild.id in stats === false) { //This is checks if guild id is in stats and if not adds it to stats.
-    stats[msg.guild.id] = {}
-    saveStats()
-  }
-
-  const guildStats = stats[msg.guild.id]
-  
-  if (msg.author.id in guildStats === false) {
-    guildStats[msg.author.id] = {
-      messages: 0,
-      xp: 0,
-      xpToNextLevel: 5,
-      level: 0,
-      lastVersionUsed: 1,
-      lastMessageTime: Date.now(),
-      gbp: 0
-    }
-    saveStats()
-  }
-  
-  const userStats = guildStats[msg.author.id]
   if (Date.now()-userStats.lastMessageTime >= 30000) {
-    userStats.messages++
-    userStats.xp += getRandomIntInclusive(5, 15)
-    if (doubleXpWeekend === true) getRandomIntInclusive(5, 15)
-    userStats.gbp += getRandomIntInclusive(5, 20)
-    if (doubleXpWeekend === true) userStats.gbp += getRandomIntInclusive(5, 20)
-    saveStats() 
+    userStats.messages++;
+    userStats.xp += getRandomIntInclusive(5, 15);
+    if (doubleXpWeekend === true) getRandomIntInclusive(5, 15);
+    userStats.gbp += getRandomIntInclusive(5, 20);
+    if (doubleXpWeekend === true) userStats.gbp += getRandomIntInclusive(5, 20);
+    saveStats();
   }
 
   var loop = 0;
@@ -160,24 +195,24 @@ client.on('messageCreate', async msg => {
     saveStats();
   }
   
-  if (userStats.gbp === null) userStats.gbp = 0
+  if (userStats.gbp === null) userStats.gbp = 0;
   if (msg.content.startsWith(prefix) === false) return;
   const args = msg.content.slice(prefix.length).trim().split(/ +/);
   const command = args.shift().toLowerCase();
   switch (command) {
     case ('profile'):
-      msg.reply(`<@${msg.author.id}> your level is ${userStats.level}, you have ${userStats.xp} xp, you have ${userStats.gbp} good bin points, and have sent ${userStats.messages} messages in this server.`)
+      msg.reply(`<@${msg.author.id}> your level is ${userStats.level}, you have ${userStats.xp} xp, you have ${userStats.gbp} good bin points, and have sent ${userStats.messages} messages in this server.`);
       break;
     case ('add'):
-      console.log(args)
-      console.log(args.length)
+      console.log(args);
+      console.log(args.length);
       if (args[0] === 'bw') {
-        if (msg.member.roles.cache.has('1060788443858337903') === false) return msg.channel.send(`<@${msg.author.id}>, you need administrator permissions to do that.`)
-        if (args.length <= 1) return msg.channel.send(`<@${msg.author.id}>, you need to specify a word to add.`)
-        if (bannedWords.includes(args[1])) return msg.channel.send(`<@${msg.author.id}>, ${args[1]} is already banned.`)
-        bannedWords.push(args[1])
-        msg.channel.send(`<@${msg.author.id}>, succesfully added ${args[1]} to the ban list.`)
-        saveBannedWords()
+        if (msg.member.roles.cache.has('1060788443858337903') === false) return msg.channel.send(`<@${msg.author.id}>, you need administrator permissions to do that.`);
+        if (args.length <= 1) return msg.channel.send(`<@${msg.author.id}>, you need to specify a word to add.`);
+        if (bannedWords.includes(args[1])) return msg.channel.send(`<@${msg.author.id}>, ${args[1]} is already banned.`);
+        bannedWords.push(args[1]);
+        msg.channel.send(`<@${msg.author.id}>, succesfully added ${args[1]} to the ban list.`);
+        saveBannedWords();
       }
       break;
     case ('remove'): 
@@ -188,11 +223,11 @@ client.on('messageCreate', async msg => {
       let index = bannedWords.indexOf(args[1]);
         bannedWords.splice(index, 1);
         msg.channel.send(`<@${msg.author.id}>, succesfully removed ${args[1]} from the ban list.`);
-        saveBannedWords()
+        saveBannedWords();
       }
       break;
     default:
-      msg.channel.send(`<@${msg.author.id}> that is an unkown command.`)
+      msg.channel.send(`<@${msg.author.id}> that is an unkown command.`);
       break;
   }
 })
