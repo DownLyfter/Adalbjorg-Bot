@@ -30,6 +30,7 @@ const fs = require('fs');
 const commandFiles = fs.readdirSync("./commands").filter(file => file.endsWith(".js"))
 const commands= []
 
+const doubleXpWeekend = false
 client.commands = new Collection()
 
 for (const file of commandFiles) {
@@ -93,7 +94,7 @@ client.on("interactionCreate", async interaction => { //No clue found this on th
 }) //this is the end of the internet magic codee.
 
 client.on('guildMemberAdd', member => {
-  if (!msg.guild.id in stats) {
+  if (!member.guild.id in stats) {
     stats[member.guild.id] = {}
     saveStats()
   }
@@ -126,10 +127,11 @@ client.on('messageCreate', async msg => {
     guildStats[msg.author.id] = {
       messages: 0,
       xp: 0,
-      xpToNextLevel: 0,
+      xpToNextLevel: 5,
       level: 0,
       lastVersionUsed: 1,
-      lastMessageTime: Date.now()
+      lastMessageTime: Date.now(),
+      gbp: 0
     }
     saveStats()
   }
@@ -138,15 +140,33 @@ client.on('messageCreate', async msg => {
   if (Date.now()-userStats.lastMessageTime >= 30000) {
     userStats.messages++
     userStats.xp += getRandomIntInclusive(5, 15)
+    if (doubleXpWeekend === true) getRandomIntInclusive(5, 15)
+    userStats.gbp += getRandomIntInclusive(5, 20)
+    if (doubleXpWeekend === true) userStats.gbp += getRandomIntInclusive(5, 20)
     saveStats() 
   }
+
+  var loop = 0;
+  while (userStats.xp >= userStats.xpToNextLevel) {
+    userStats.xp -= userStats.xpToNextLevel;
+    userStats.level++;
+    userStats.xpToNextLevel = Math.floor(123*userStats.level);
+    loop++;
+  } if (loop === 1) {
+    msg.channel.send(`<@${msg.author.id}>, You leveled up! You are now level ${userStats.level}!`);
+    saveStats();
+  } else if(loop > 1){
+    msg.channel.send(`<@${msg.author.id}>, You leveled up ${loop} times! You are now level ${userStats.level}!`);
+    saveStats();
+  }
   
+  if (userStats.gbp === null) userStats.gbp = 0
   if (msg.content.startsWith(prefix) === false) return;
   const args = msg.content.slice(prefix.length).trim().split(/ +/);
   const command = args.shift().toLowerCase();
   switch (command) {
     case ('profile'):
-      msg.reply(`<@${msg.author.id}> your level is ${userStats.level}, you have ${userStats.xp} xp, and have sent ${userStats.messages} messages in this server.`)
+      msg.reply(`<@${msg.author.id}> your level is ${userStats.level}, you have ${userStats.xp} xp, you have ${userStats.gbp} good bin points, and have sent ${userStats.messages} messages in this server.`)
       break;
     case ('add'):
       console.log(args)
@@ -162,12 +182,12 @@ client.on('messageCreate', async msg => {
       break;
     case ('remove'): 
       if (args[0] === 'bw') {
-        if (msg.member.roles.cache.has('1060788443858337903') === false) return msg.channel.send(`<@${msg.author.id}>, you need administrator permissions to do that.`)
-        if (args.length <= 1) return msg.channel.send(`<@${msg.author.id}>, you need to specify a word to add.`)
-        if (!bannedWords.includes(args[1])) return msg.channel.send(`<@${msg.author.id}>, ${args[1]} is not banned.`)
-        let index = bannedWords.indexOf(args[1])
-        bannedWords.splice(index, 1)
-        msg.channel.send(`<@${msg.author.id}>, succesfully removed ${args[1]} from the ban list.`)
+        if (msg.member.roles.cache.has('1060788443858337903') === false) return msg.channel.send(`<@${msg.author.id}>, you need administrator permissions to do that.`);
+        if (args.length <= 1) return msg.channel.send(`<@${msg.author.id}>, you need to specify a word to add.`);
+        if (!bannedWords.includes(args[1])) return msg.channel.send(`<@${msg.author.id}>, ${args[1]} is not banned.`);
+      let index = bannedWords.indexOf(args[1]);
+        bannedWords.splice(index, 1);
+        msg.channel.send(`<@${msg.author.id}>, succesfully removed ${args[1]} from the ban list.`);
         saveBannedWords()
       }
       break;

@@ -9,7 +9,6 @@ module.exports = {
     async execute(interation) {
         const guildStats = stats[interation.guild.id]
         const userStats = guildStats[interation.user.id] 
-        interation.reply( `<@${interation.user.id}> your level is ${userStats.level}, you have ${userStats.xp} xp, and have sent ${userStats.messages} messages in this server.`)
-       
+        interation.reply( `<@${interation.user.id}> your level is ${userStats.level}, you have ${userStats.xp} xp, and have sent ${userStats.messages} messages in this server.`)     
     }
 }
