@@ -64,7 +64,10 @@ const {
 } = require("discord-api-types/v9");
 const jsonfile = require('jsonfile');
 const fs = require('fs');
-const { format } = require("path")
+const {
+  format
+} = require("path")
+const { stringify } = require("querystring")
 
 const commandFiles = fs.readdirSync("./commands").filter(file => file.endsWith(".js"))
 const commands = []
@@ -126,7 +129,7 @@ client.on('voiceStateUpdate', (oldState, newState) => {
   if (newState.channelId) { //Checks if user joins a vc
     if (!oldState.channelId) { //Checks if user joined a voice channel or came from another one.
       userStats.voice.ChannelJoines++;
-      userStats.voice.ChannelTime = Date.now()-userStats.voice.JoinTime
+      userStats.voice.ChannelTime += Date.now() - userStats.voice.JoinTime;
       userStats.voice.JoinTime = Date.now();
     }; //if they came from another nothing is done untill they leave the voice channel.
   };
@@ -136,7 +139,7 @@ client.on('voiceStateUpdate', (oldState, newState) => {
     let xpAddLoops = Math.floor((Date.now() - userStats.voice.JoinTime) / 60000);
     while (xpAddLoops >= loops) {
       userStats.xp += getRandomIntInclusive(5, 15);
-      if (doubleXpWeekend === true) getRandomIntInclusive(5, 25);
+      if (doubleXpWeekend === true) userStats.xp += getRandomIntInclusive(5, 25);
       loops++
     };
   };
@@ -220,32 +223,104 @@ client.on('messageCreate', async msg => {
   if (msg.content.startsWith(prefix) === false) return;
   const args = msg.content.slice(prefix.length).trim().split(/ +/);
   const command = args.shift().toLowerCase();
+  console.log(command)
+  console.log((args))
   switch (command) {
-    case ('afkchannel'):
-      if (msg.member.roles.cache.has('1060788443858337903') === false) return msg.channel.send(`<@${msg.author.id}>, you need administrator permissions to do that.`);
-      if (args[0]) {
-        let formartedId = args[0].replace('<', '').replace('#', '').replace('>', '');
-        guildStats.afkChannel = formartedId;
-        msg.channel.send(`<@${msg.author.id}>, added ${formartedId} as an AFK channel.`)
-      } else msg.channel.send(`<@${msg.author.id}>, you need to mention a channel to set as afk.`)
+    case ('voicestats'):
+      const exampleEmbed = new MessageEmbed()
+      .setTitle(`${msg.author.username}'s, VoiceStats!`)
+      .setAuthor({
+        name: `${msg.author.username}'s, VoiceStats!`,
+        iconURL: msg.author.displayAvatarURL()
+      })
+      .setThumbnail(msg.author.displayAvatarURL())
+      .addFields({
+        name: 'VC\'s left',
+        value: `${userStats.voice.ChannelLeaves}`,
+        inline: true
+      },{
+        name: 'Camera\'s enabled.',
+        value: `${userStats.voice.ChannelCams}`,
+        inline: true
+      }, {
+        name: 'Time\'s AFK',
+        value: `${userStats.voice.ChannelAfks}`,
+        inline: true
+      }, {
+        name: 'Times defened',
+        value: `${userStats.voice.ChannelDefens}`,
+        inline: true
+      }, {
+        name: 'Times muted',
+        value: `${userStats.voice.ChannelMutes}`,
+        inline: true
+      }, {
+        name: 'VC\'s joined',
+        value: `${userStats.voice.ChannelJoines}`,
+        inline: true
+      }, {
+        name: 'Minutes in voice channels',
+        value: `${Math.floor((userStats.voice.ChannelTime*100)/60000)/100}`,
+        inline: false
+      }, )
+      .setTimestamp()
+    msg.channel.send({
+      embeds: [exampleEmbed]
+    });
+    break;
+    case ('set'):
+      switch (args[0]) {
+        case ('botchannel'):
+          break;
+        case ('afkchannel'):
+          if (msg.member.roles.cache.has('1060788443858337903') === false) return msg.channel.send(`<@${msg.author.id}>, you need administrator permissions to do that.`);
+          if (args[1]) {
+            let formartedId = args[1].replace('<', '').replace('#', '').replace('>', '');
+            guildStats.afkChannel = formartedId;
+            msg.channel.send(`<@${msg.author.id}>, added ${formartedId} as an AFK channel.`);
+          } else msg.channel.send(`<@${msg.author.id}>, you need to mention a channel to set as afk.`);
+          break;
+        default:
+          msg.channel.send(`<@${msg.author.id}>, you need to mention a channel to set as the bot channel.`)
+          break;
+      };
       break;
     case ('profile'):
       if (msg.mentions.members.id === args[1]) {
         console.log(msg.mentions.members.id)
       } else {
-          const exampleEmbed = new MessageEmbed()
-      .setTitle( `${msg.author.username}'s, Profile!`)
-      .setAuthor({ name: `${msg.author.username}'s, Profile!`, iconURL: msg.author.displayAvatarURL()})
-      .setThumbnail(msg.author.displayAvatarURL())
-      .addFields(
-        { name: 'Level', value: `${userStats.level}`, inline: true },
-        { name: 'Xp', value: `${userStats.xp}`, inline: true },
-        { name: 'GBP', value: `${userStats.gbp}`, inline: true },
-        { name: 'Messages', value: `${userStats.messages}`, inline: true },
-        { name: 'Minutes in voice channels', value: `${Math.floor((userStats.voice.ChannelTime*100)/60000)/100}`, inline: false },
-      )
-	    .setTimestamp()
-      msg.channel.send({ embeds: [exampleEmbed] });
+        const exampleEmbed = new MessageEmbed()
+          .setTitle(`${msg.author.username}'s, Profile!`)
+          .setAuthor({
+            name: `${msg.author.username}'s, Profile!`,
+            iconURL: msg.author.displayAvatarURL()
+          })
+          .setThumbnail(msg.author.displayAvatarURL())
+          .addFields({
+            name: 'Level',
+            value: `${userStats.level}`,
+            inline: true
+          }, {
+            name: 'Xp',
+            value: `${userStats.xp}`,
+            inline: true
+          }, {
+            name: 'GBP',
+            value: `${userStats.gbp}`,
+            inline: true
+          }, {
+            name: 'Messages',
+            value: `${userStats.messages}`,
+            inline: true
+          }, {
+            name: 'Minutes in voice channels',
+            value: `${Math.floor((userStats.voice.ChannelTime*100)/60000)/100}`,
+            inline: false
+          }, )
+          .setTimestamp()
+        msg.channel.send({
+          embeds: [exampleEmbed]
+        });
       }
       break;
     case ('add'):
